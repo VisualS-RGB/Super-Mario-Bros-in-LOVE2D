@@ -1,5 +1,5 @@
 GameReleased = false -- If the game is ready, set this var on true, it disable all Debug tools.
-Debug = true
+Debug = false
 
 function love.conf(t)
     t.identity = "Nil" -- Save file directory.

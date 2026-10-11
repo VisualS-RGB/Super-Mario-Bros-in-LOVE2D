@@ -1,11 +1,13 @@
 local player = {}
 player.__index = player
 
+local BoxCollider = require"src.components.boxCollider"
+
 function player.new()
     local self = setmetatable({}, player)
 
     self.position = {x = 100, y = 100}
-    self.colliderSize = {x = 16, y = 16}
+    self.boxCollider = BoxCollider.new(nil, nil, 2)
     self.velocity = {x = 0, y = 0}
 
     -- Parameters:
@@ -28,13 +30,11 @@ function player.new()
     self.smallMarioGrid = Anim8.newGrid(16, 16, self.smallMarioTexture:getWidth(), self.smallMarioTexture:getHeight())
 
     self.animations = {
-        idle = Anim8.newAnimation(self.smallMarioGrid("1-1", 1), 1)
+        idle = Anim8.newAnimation(self.smallMarioGrid("1-1", 1), 1) 
     }
 
     return self
 end
-
-local groundLimit = 212 -- TEMP GROUND COL FOR THE MARIO PHISICS
 
 function player:Update(dt)
     self:Movement(dt)
@@ -44,54 +44,70 @@ function player:Update(dt)
     -- Apply impulse:
     self.position.x = self.position.x + self.velocity.x * dt
     self.position.y = self.position.y + self.velocity.y * dt
+
+    self.boxCollider:UpdateCollider(
+        {x = self.position.x, y = self.position.y},
+        {x = 16, y = 16}
+    )
 end
 
 function player:Draw()
     -- Draw animations:
     love.graphics.setColor(1, 1, 1, 1)
-    local ox = self.movementDirection == -1 and self.colliderSize.x or 0
+    local ox = self.movementDirection == -1 and self.boxCollider.size.x + self.boxCollider.paddingX or 0
     self.animations.idle:draw(self.smallMarioTexture, self.position.x, self.position.y, 0, self.movementDirection, 1, ox)
 
-    -- Draw Collider:
-    if Debug == false then return end
-    love.graphics.setColor(RgbForever.Color(150, 20, 100, 150))
-    love.graphics.rectangle("fill", self.position.x, self.position.y, self.colliderSize.x, self.colliderSize.y)
+    self.boxCollider:ShowCollider({r = 150, g = 20, b = 100}) -- Draw Collider:
 end
 
 function player:KeyPressed(key)
-    if key == "space" and self:OnGround() then self.jumping = true
-    self.velocity.y = -120 end -- Start jump.
+    if key == "space" and self:OnGround() then 
+        self.jumping = true
+        self.velocity.y = -120 
+    end -- Start jump.
 end
 
 function player:Movement(dt)
     -- Input:
-    if love.keyboard.isDown("left") then 
+    if love.keyboard.isDown("left") and not self.boxCollider.colLeft then 
         self.velocity.x = -self.movementSpeed
         self.movementDirection = -1
-    elseif 
-        love.keyboard.isDown("right") then self.velocity.x = self.movementSpeed
+    elseif love.keyboard.isDown("right") and not self.boxCollider.colRight then 
+        self.velocity.x = self.movementSpeed
         self.movementDirection = 1
-    else self.velocity.x = 0 end
+    else 
+        self.velocity.x = 0 
+    end
 end
 
 function player:Gravity(dt)
-    if self:OnGround() and self.velocity.y > 0 then
+    if self:OnGround() and self.velocity.y >= 0 then
         self.velocity.y = 0
-        self.position.y = groundLimit - self.colliderSize.y + 0.01
+        self.position.y = self.boxCollider.otherColPos.y - self.boxCollider.size.y + 0.01
         return
     end
 
+    if self.boxCollider.colUp then  -- Colliding with an block, start to fall.
+        self.velocity.y = 100 * dt
+        self.position.y = self.position.y + 3
+    return end
+
     -- Fall.
-    if self.jumping then return end -- Don't apply the gravity if th eplayer are on the air.
+    if self.jumping then return end -- Don't apply the gravity if the player are on the air.
     self.velocity.y = self.velocity.y + self.maxGravityForce * dt
 end
 
 function player:Jumping(dt)
-    print(self.jumping)
+    if self.boxCollider.colUp then
+        self.jumping = false
+        return
+    end
 
     if not self.jumping then
         self.jumpTimer = 0 
-        if self.velocity.y <= 0 and not love.keyboard.isDown("space") then self.velocity.y = self.velocity.y * 0.7 end
+        if self.velocity.y <= 0 and not love.keyboard.isDown("space") then 
+            self.velocity.y = self.velocity.y * 0.7 
+        end
         return
     end
 
@@ -105,7 +121,7 @@ function player:Jumping(dt)
 end
 
 function player:OnGround()
-    if self.position.y + self.colliderSize.y > groundLimit then return true end
+    if self.boxCollider.colDown then return true end
     return false
 end
 
