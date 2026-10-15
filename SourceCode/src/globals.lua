@@ -1,19 +1,6 @@
 -- Global libraries:
-Push = require"lib.push" -- Resolution configuration.
-Lem = require"lib.lem" -- Event buses.
-RgbForever = require"lib.rgbForever" -- Add RBG colors.
-Anim8 = require"lib.anim8" -- Compatibility with SpriteSheets animations.
-Sti = require"lib.sti" -- Compatibility with Tiled tilemaps.
-Gamera = require"lib.gamera" -- Cameras.
-
--- Global managers:
-SceneManager = require"src.managers.sceneManager"
-AudioManager = require"src.managers.audioManager"
-
 love.graphics.setDefaultFilter("nearest", "nearest") -- Texture filter mode.
-
--- Global parameters:
-TimeScale = 1
+Push = require"lib.push" -- Resolution configuration.
 
 -- Setup push:
 Push:setupScreen(
@@ -25,5 +12,17 @@ Push:setupScreen(
         resizable = true
     }
 )
+
+Lem = require"lib.lem" -- Event buses.
+RgbForever = require"lib.rgbForever" -- Add RBG colors.
+Sti = require"lib.sti" -- Compatibility with Tiled tilemaps.
+
+-- Global managers:
+SceneManager = require"src.managers.sceneManager"
+AudioManager = require"src.managers.audioManager"
+Debug = require"src.debug"
+
+-- Global parameters:
+TimeScale = 1
 
 MainEventBus = Lem:new()

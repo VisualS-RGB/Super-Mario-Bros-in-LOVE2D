@@ -50,20 +50,26 @@ function boxCollider:CheckCollision(_other)
     self.otherColPos = _other.position
     self.otherColSize = _other.size
 
-    -- 3) Cuánto se mete cada lado mío dentro del otro
     local pRight = (self.position.x + self.size.x) - _other.position.x
     local pLeft  = (_other.position.x + _other.size.x) - self.position.x
     local pDown  = (self.position.y + self.size.y) - _other.position.y
     local pUp    = (_other.position.y + _other.size.y) - self.position.y
 
-    -- 4) La penetración más chica es el lado por el que chocamos
-    local minimo = math.min(pRight, pLeft, pDown, pUp)
+    -- Disable edge collision if the collision has another collision next to it.
+    if _other.nLeft then pRight = math.huge end
+    if _other.nRight then pLeft = math.huge end
+    if _other.nUp then pDown = math.huge end
+    if _other.nDown then pUp = math.huge end
 
-    if minimo == pRight then
+    local min = math.min(pRight, pLeft, pDown, pUp)
+    if min == math.huge then return end
+
+    -- Set the border who are colliding:
+    if min == pRight then
         self.colRight = true
-    elseif minimo == pLeft then
+    elseif min == pLeft then
         self.colLeft = true
-    elseif minimo == pDown then
+    elseif min == pDown then
         self.colDown = true
     else
         self.colUp = true
@@ -79,7 +85,8 @@ function boxCollider:ResetCollisionStates()
 end
 
 function boxCollider:ShowCollider(_colliderColor, _line, _fill)
-    if Debug == false then return end
+    if not Debug.debugMenu then return end
+    if not Debug.debugConfig.showHitboxes then return end
     
     love.graphics.setColor(RgbForever.Color(_colliderColor.r, _colliderColor.g, _colliderColor.b, 150))
     if _line then love.graphics.rectangle("line", self.position.x, self.position.y, self.size.x, self.size.y) end

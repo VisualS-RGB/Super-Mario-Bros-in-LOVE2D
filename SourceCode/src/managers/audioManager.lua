@@ -6,8 +6,8 @@ local audioManager = {
     themeSelected = nil,
     pausedAudios = {},
 
-    sfxRoute = "assets/",
-    themesRoute = "assets/"
+    sfxRoute = "assets/sounds/",
+    themesRoute = "assets/sounds/"
 }
 
 function audioManager:PlayTheme(_audio, _volume, _pitch, _loop)

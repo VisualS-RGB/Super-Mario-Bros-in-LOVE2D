@@ -1,5 +1,4 @@
 require"src.globals"
-local debug = require"src.debug"
 
 function love.resize(x, y) Push:resize(x, y) end -- Resize fixed resolution. 
 
@@ -17,12 +16,12 @@ function love.draw()
     Push:start()
 
     SceneManager:Draw()
-    debug:DrawPanel()
+    Debug:DrawPanel()
 
     Push:finish()
 end
 
 function love.keypressed(key)
     SceneManager:KeyPressed(key)
-    debug:ReadPanelInput(key)
+    Debug:ReadPanelInput(key)
 end
