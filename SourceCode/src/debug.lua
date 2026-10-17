@@ -1,46 +1,67 @@
 local debug = {
     debugMenu = false,
     debugConfig = {
-        showHitboxes = true,
+        showHitboxes = false,
         vsync = love.window.getVSync() ~= 0
     },
 
-    Colliding = false,
     ColLeft = nil,
     ColRight = nil,
     ColUp = nil,
     ColDown = false,
-    playerVel = {x = 0, y = 0}
+    playerVel = {x = 0, y = 0},
+
+    leftTexts = {},
+    rightTexts = {}
 }
 
-local padding = 2
-local textYsize = 12
+local padding = 3
+local textYsize = 10
 
-function debug:DrawPanel()
+function debug:Update()
     if GameReleased or not self.debugMenu then return end
-    
+
+    -- Left column:
+    self.leftTexts = {
+        "DEBUG PANEL!",
+        "FPS: " .. tostring(love.timer.getFPS()),
+        "",
+        "PLAYER: ",
+        "ColLeft: " .. tostring(self.ColLeft),
+        "ColRight: " .. tostring(self.ColRight),
+        "ColUp: " .. tostring(self.ColUp),
+        "ColDown: " .. tostring(self.ColDown),
+        "PyrVel: " .. string.format("%.0f", self.playerVel.x) .. ", " .. string.format("%.0f", self.playerVel.y),
+    }
+
+    -- Right column:
+    self.rightTexts = {
+        "",
+        "SHOW HITBOX: " .. tostring(self.debugConfig.showHitboxes),
+        "VSYNC: " .. tostring(self.debugConfig.vsync)
+    }
+end
+
+function debug:Draw()
+    if GameReleased or not self.debugMenu then return end
+   
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("DEBUG PANEL!", padding, padding + (textYsize * 0))
 
+    -- Print data:
     -- Left:
-    love.graphics.print("FPS: " .. tostring(love.timer.getFPS()), padding, padding + (textYsize * 1))
-
-    love.graphics.print("PLAYER: ", padding, padding + (textYsize * 3))
-    love.graphics.print("Entered: " .. tostring(self.Colliding), padding, padding + (textYsize * 4))
-    love.graphics.print("ColLeft: " .. tostring(self.ColLeft), padding, padding + (textYsize * 5))
-    love.graphics.print("ColRight: " .. tostring(self.ColRight), padding, padding + (textYsize * 6))
-    love.graphics.print("ColUp: " .. tostring(self.ColUp), padding, padding + (textYsize * 7))
-    love.graphics.print("ColDown: " .. tostring(self.ColDown), padding, padding + (textYsize * 8))
-    love.graphics.print("PyrVel: " .. tostring(self.playerVel.x) .. ", " .. tostring(self.playerVel.y), padding, padding + (textYsize * 9))
+    for i, text in ipairs(self.leftTexts) do
+        love.graphics.print(text, padding, padding + textYsize * (i - 1))
+    end
 
     -- Right:
-    local collisionText = "SHOW HITBOX: " .. tostring(self.debugConfig.showHitboxes)
-    local textWidth = love.graphics.getFont():getWidth(collisionText)
-    love.graphics.print(collisionText, Push:getWidth() - textWidth - padding, padding + (textYsize * 1))
-
-    local vsyncText = "VSYNC: " .. tostring(self.debugConfig.vsync)
-    local textWidth = love.graphics.getFont():getWidth(vsyncText)
-    love.graphics.print(vsyncText, Push:getWidth() - textWidth - padding, padding + (textYsize * 2))
+    for i, text in ipairs(self.rightTexts) do
+        local textWidth = love.graphics.getFont():getWidth(text)
+        love.graphics.print(
+            text,
+            Push:getWidth() - textWidth - padding,
+            padding + textYsize * (i - 1)
+        )
+    end
 end
 
 function debug:ReadPanelInput(key)

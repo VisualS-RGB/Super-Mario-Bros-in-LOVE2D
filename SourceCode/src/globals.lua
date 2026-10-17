@@ -25,4 +25,9 @@ Debug = require"src.debug"
 -- Global parameters:
 TimeScale = 1
 
+-- Init:
+-- Set Super Mario NES font:
+local MainFont = love.graphics.newFont("assets/super-mario-bros-font.otf", 8)
+love.graphics.setFont(MainFont)
+
 MainEventBus = Lem:new()
