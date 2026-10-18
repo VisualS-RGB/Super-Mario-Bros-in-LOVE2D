@@ -7,26 +7,61 @@ local BoxCollider = require"src.components.boxCollider"
 function player.new()
     local self = setmetatable({}, player)
 
+    -- Components:
     self.position = {x = 2.5 * 16, y = 12 * 16}
     self.velocity = {x = 0, y = 0}
     self.collider = BoxCollider.new(nil, nil, 2)
 
+    -- Input:
+    self.input = {
+        left = "a", right = "d", up = "w", down = "d",
+        action = "k", jump = "l"
+    }
+
+    -- States:
+    self.onFloor = true
+    self.falling = false
+    self.rising = false
+
+    self.moving = false
+    self.running = false
+    self.movAccelerating = false
+    self.skidding = false
+    self.movMaxSpeed = false
+    self.movDirecction = 1
+
+    self.jumped = false
+    self.jumpMaxDistance = false
+
     -- Parameters:
-    -- Gravity:
-    self.starterGravityForce = 70
-    self.maxGravityForce = 850
-    self.gravityAcceleration = 1.1
+    self.walkAcc = 133.59375 -- Aceleración al caminar en tierra
+    self.runAcc = 200.390625 -- Aceleración al correr (con el botón de sprint presionado) en tierra
+    self.minWalk = 4.453125 -- Velocidad mínima inicial al empezar a caminar
+    self.maxWalk = 93.75 -- Velocidad máxima normal caminando
+    self.maxRun = 153.75 -- Velocidad máxima corriendo
+    self.releaseDeacc = 182.8125 -- Desaceleración/frenado natural al soltar el pad direccional
+    self.skidDeacc = 365.625 -- Desaceleración al girar o derrapar (cambiar de dirección bruscamente)
+    self.turnThreshold = 33.75 -- Umbral de velocidad a partir del cual se activa la animación y física de derrape
 
-    -- Jump:
-    self.jumpImpulse = 1000
-    self.jumpDuration = 0.136
-    self.jumpTimer = 0.0
-    self.jumping = false
+    self.airSpdThreshold = 108.75 -- Umbral de velocidad horizontal en el aire para determinar el tipo de resistencia
+    self.airSlowAcc = 133.59375 -- Aceleración en el aire cuando la velocidad es baja
+    self.airFastAcc = 200.390625 -- Aceleración en el aire cuando la velocidad es alta (mayor a maxWalk)
+    self.airFastDrag = 3.046875 -- Resistencia/frenado en el aire al ir a alta velocidad y presionar en contra
+    self.airSlowDrag = 2.2265625 -- Resistencia/frenado en el aire al ir a baja velocidad y presionar en contra
 
-    self.movementSpeed = 117
-    self.movementDirection = 1
+    self.jumpSpd = 240.0 -- Velocidad de impulso inicial para un salto normal/pequeño
+    self.bigJumpSpd = 300.0 -- Velocidad de impulso inicial para un salto largo/rápido (fastest jump)
+    self.smallUpDrag = 450.0 -- Resistencia a la subida (gravedad menor) para saltos cortos o baja velocidad
+    self.mediumUpDrag = 421.875 -- Resistencia a la subida para saltos a velocidad media
+    self.bigUpDrag = 562.5 -- Resistencia a la subida para saltos a máxima velocidad (mantiene el salto más tiempo arriba)
+    self.smallGravity = 1575.0 -- Gravedad aplicada al caer o soltar el botón de salto a baja velocidad
+    self.mediumGravity = 1350.0 -- Gravedad aplicada a velocidad media
+    self.bigGravity = 2025.0 -- Gravedad aplicada al caer a máxima velocidad o soltar el botón corriendo
+    self.fastJumpThreshold = 60.0 -- Umbral de velocidad horizontal para clasificar el salto como "rápido"
+    self.fastestJumpThreshold = 138.75 -- Umbral de velocidad horizontal para clasificar el salto como "muy rápido" (salto máximo)
+    self.maxFall = 240.0 -- Velocidad límite de caída (terminal velocity)
 
-    -- Animations:
+    -- Graphic design:
     self.smallMarioTexture = love.graphics.newImage("assets/textures/smallMario.png")
     self.smallMarioGrid = Anim8.newGrid(16, 16, self.smallMarioTexture:getWidth(), self.smallMarioTexture:getHeight())
 
@@ -36,14 +71,16 @@ function player.new()
         jumping = Anim8.newAnimation(self.smallMarioGrid("2-2", 1), 1)
     }
     self.animationPlaying = self.animations.idle
+    self.spriteDirecction = 1
 
     return self
 end
 
 function player:Update(dt)
+    self:CheckGround()
+
     self:Movement(dt)
-    self:Jumping(dt)
-    self:Gravity(dt)
+
     self:Death()
     self:AnimationController(dt)
 
@@ -53,15 +90,13 @@ function player:Update(dt)
 
     self.collider:UpdateCollider(
         {x = self.position.x, y = self.position.y},
-        {x = 16, y = 16}
+        {x = 16, y = 15}
     )
 
     -- DEBUG PARAMETERS:
-    Debug.ColLeft = self.collider.colLeft
-    Debug.ColRight = self.collider.colRight
-    Debug.ColUp = self.collider.colUp
-    Debug.ColDown = self.collider.colDown
-    Debug.playerVel = self.velocity
+    Debug.pyr.vel = self.velocity
+    Debug.pyr.moving = self.moving
+    Debug.pyr.running = self.running
 end
 
 function player:Draw()
@@ -74,63 +109,43 @@ function player:Draw()
 end
 
 function player:KeyPressed(key)
-    if key == "space" and self:OnGround() then 
-        self.jumping = true
-        self.velocity.y = -120
-        AudioManager:PlaySfx("jump.ogg", 50)
-    end -- Start jump.
 end
 
 function player:Movement(dt)
+    -- State controller:
     -- Input:
-    if love.keyboard.isDown("left") and not self.collider.colLeft and self.position.x >= 0 then        
-        self.velocity.x = -self.movementSpeed
-        self.movementDirection = -1
-    elseif love.keyboard.isDown("right") and not self.collider.colRight then 
-        self.velocity.x = self.movementSpeed
-        self.movementDirection = 1
+    local isLeft = love.keyboard.isDown(self.input.left)
+    local isRight = love.keyboard.isDown(self.input.right)
+    local isAction = love.keyboard.isDown(self.input.action)
+
+    if isRight then
+        self.movDirecction = 1
+    elseif isLeft then
+        self.movDirecction = -1
     else 
-        self.velocity.x = 0
-    end
-end
-
-function player:Gravity(dt)
-    if self:OnGround() and self.velocity.y >= 0 then
-        self.velocity.y = 0
-        self.position.y = self.collider.otherColPos.y - self.collider.size.y + 0.01
-        return
-    end
-
-    if self.collider.colUp then  -- Colliding with an block, start to fall.
-        self.velocity.y = 100 * dt
-        self.position.y = self.position.y + 3
-    return end
-
-    -- Fall.
-    if self.jumping then return end -- Don't apply the gravity if the player are on the air.
-    self.velocity.y = self.velocity.y + self.maxGravityForce * dt
-end
-
-function player:Jumping(dt)
-    if self.collider.colUp then
-        self.jumping = false
-        return
-    end
-
-    if not self.jumping then
-        self.jumpTimer = 0 
-        if self.velocity.y <= 0 and not love.keyboard.isDown("space") then 
-            self.velocity.y = self.velocity.y * 0.7 
+        if self.velocity.x >= -1 and self.velocity.x <= 1 then
+            self.velocity.x = 0
+            self.movDirecction = 0
+            self.moving = false
+        else
+            self.velocity.x = self.velocity.x - self.walkAcc * self.movDirecction * dt
         end
-        return
     end
 
-    -- Jumping:
-    self.velocity.y = self.velocity.y - self.jumpImpulse * dt -- Apply force
-    self.jumpTimer = self.jumpTimer + dt -- Timer.
+    -- Apply starter mov impulse if aren't moving before:
+    if not self.moving and self.movDirecction ~= 0 then
+        self.velocity.x = self.minWalk * self.movDirecction
+        self.moving = true -- Set move state.
+    end
 
-    if self.jumpTimer >= self.jumpDuration or not love.keyboard.isDown("space") then
-        self.jumping = false
+    if isAction and self.moving then self.running = true else self.running = false end -- Set running state.
+
+    -- Physics:
+    if self.moving then
+        if isRight then self.movDirecction = 1
+        elseif isLeft then self.movDirecction = -1 end
+
+        if isRight or isLeft then self.velocity.x = self.minWalk * self.movDirecction end
     end
 end
 
@@ -140,21 +155,26 @@ end
 
 function player:AnimationController(dt)
 
-    if not self:OnGround() then
+    if not self.onFloor then
         self.animationPlaying = self.animations.jumping
         goto updateAnimation
     end
 
-    if love.keyboard.isDown("left") or love.keyboard.isDown("right") then self.animationPlaying = self.animations.running
+    if love.keyboard.isDown(self.input.left) then
+        self.animationPlaying = self.animations.running
+        self.movementDirection = -1
+    elseif love.keyboard.isDown(self.input.right) then 
+        self.animationPlaying = self.animations.running
+        self.movementDirection = 1
     else self.animationPlaying = self.animations.idle end
 
     ::updateAnimation::
     self.animationPlaying:update(dt)
 end
 
-function player:OnGround()
-    if self.collider.colDown then return true end
-    return false
+function player:CheckGround()
+    if self.collider.colDown then self.onFloor = true
+    else self.onFloor = false end
 end
 
 return player

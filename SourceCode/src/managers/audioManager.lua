@@ -29,6 +29,8 @@ function audioManager:PlayTheme(_audio, _volume, _pitch, _loop)
     if _loop == nil then _loop = true end
     songToPlay:setLooping(_loop)
 
+    _volume = _volume * (self.masterVolume / 100) -- Apply master volume.
+
     self.themeSelected = songToPlay
     love.audio.play(self.themeSelected)
 end
@@ -44,9 +46,15 @@ function audioManager:PlaySfx(_audio, _volume, _pitch, _variablePitch)
     if _volume == nil then _volume = 100
     elseif _volume > 200 then assert(false, "The value inserted on PlaySFX(_volume) is too high!") end -- If the volume is too high, jump an bug screen.
     _volume = _volume * (self.sfxVolume/ 100) / 100
+    _volume = _volume * (self.masterVolume / 100) -- Apply master volume.
     soundToPlay:setVolume(_volume / 2)
 
     love.audio.play(soundToPlay)
+end
+
+function audioManager:ApplyMasterVolume(_volume)
+    self.masterVolume = _volume
+    love.audio.setVolume(self.masterVolume / 100)
 end
 
 function audioManager:SetPause(_pause)

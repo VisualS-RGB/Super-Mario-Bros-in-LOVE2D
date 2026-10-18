@@ -16,6 +16,9 @@ local worldColliders = {}
 function scene:Load()
     player = Player.new()
 
+    -- Reset:
+    worldColliders = {}
+
     -- Get the solids blocks on tileset:
     local solid = {}
     for y = 1, tilemap.height do
@@ -34,7 +37,7 @@ function scene:Load()
 
     -- Add collision to the solid blocks:
     for i, layer in ipairs(tilemap.layers) do
-        if layer.name == "BG" then goto dontApplyCollision end
+        if layer.name == "BG" or layer.name == "FlagPole" then goto dontApplyCollision end
 
         for y = 1, layer.height do
             for x = 1, layer.width do
@@ -79,6 +82,7 @@ function scene:Draw()
     tilemap:drawLayer(tilemap.layers["Undestructable"])
     tilemap:drawLayer(tilemap.layers["Destructable"])
     tilemap:drawLayer(tilemap.layers["LuckyBlocks"])
+    tilemap:drawLayer(tilemap.layers["FlagPole"])
     player:Draw()
 
     for i, collider in ipairs(worldColliders) do

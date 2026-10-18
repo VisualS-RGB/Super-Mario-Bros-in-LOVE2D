@@ -1,22 +1,29 @@
 local debug = {
-    debugMenu = false,
+    debugMenu = true,
     debugConfig = {
+        mute = true,
         showHitboxes = false,
         vsync = love.window.getVSync() ~= 0
     },
 
-    ColLeft = nil,
-    ColRight = nil,
-    ColUp = nil,
-    ColDown = false,
-    playerVel = {x = 0, y = 0},
-
     leftTexts = {},
-    rightTexts = {}
+    rightTexts = {},
+
+    pyr = {
+        vel = {},
+        moving = {},
+        running = {},
+    }
 }
 
 local padding = 3
 local textYsize = 10
+
+function debug:Load()
+    -- Set edfault debug values:
+    love.window.setVSync(self.debugConfig.vsync) -- VSync.
+    if self.debugConfig.mute then AudioManager:ApplyMasterVolume(0) else AudioManager:ApplyMasterVolume(100) end -- Volume.
+end
 
 function debug:Update()
     if GameReleased or not self.debugMenu then return end
@@ -27,16 +34,16 @@ function debug:Update()
         "FPS: " .. tostring(love.timer.getFPS()),
         "",
         "PLAYER: ",
-        "ColLeft: " .. tostring(self.ColLeft),
-        "ColRight: " .. tostring(self.ColRight),
-        "ColUp: " .. tostring(self.ColUp),
-        "ColDown: " .. tostring(self.ColDown),
-        "PyrVel: " .. string.format("%.0f", self.playerVel.x) .. ", " .. string.format("%.0f", self.playerVel.y),
+        "XVel: " .. tostring(self.pyr.vel.x),
+        "YVel: " .. tostring(self.pyr.vel.y),
+        "Moving: " .. tostring(self.pyr.moving),
+        "Running: " .. tostring(self.pyr.running),
     }
 
     -- Right column:
     self.rightTexts = {
         "",
+        "MUTE: " .. tostring(self.debugConfig.mute),
         "SHOW HITBOX: " .. tostring(self.debugConfig.showHitboxes),
         "VSYNC: " .. tostring(self.debugConfig.vsync)
     }
@@ -78,6 +85,12 @@ function debug:ReadPanelInput(key)
     if key == "v" then
         self.debugConfig.vsync = not self.debugConfig.vsync
         love.window.setVSync(self.debugConfig.vsync)
+    end
+
+    if key == "m" then
+        self.debugConfig.mute = not self.debugConfig.mute
+        
+        if self.debugConfig.mute then AudioManager:ApplyMasterVolume(0) else AudioManager:ApplyMasterVolume(100) end
     end
 end
 

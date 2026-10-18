@@ -10,5 +10,3 @@ function ObjName.new()
 end
 
 return ObjName
-
--- Soy pepe

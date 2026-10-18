@@ -4,6 +4,7 @@ function love.resize(x, y) Push:resize(x, y) end -- Resize fixed resolution.
 
 function love.load()
     SceneManager:Load()
+    Debug:Load()
 end
 
 function love.update(dt)
