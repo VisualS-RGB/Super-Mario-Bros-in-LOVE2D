@@ -1,6 +1,7 @@
 local player = {}
 player.__index = player
 
+local Sign = require"lib.math.sign"
 local Anim8 = require"lib.anim8"
 local BoxCollider = require"src.components.boxCollider"
 
@@ -28,7 +29,6 @@ function player.new()
     self.movAccelerating = false
     self.skidding = false
     self.movMaxSpeed = false
-    self.movDirecction = 1
 
     self.jumped = false
     self.jumpMaxDistance = false
@@ -95,8 +95,10 @@ function player:Update(dt)
 
     -- DEBUG PARAMETERS:
     Debug.pyr.vel = self.velocity
+    Debug.pyr.onFloor = self.onFloor
     Debug.pyr.moving = self.moving
     Debug.pyr.running = self.running
+    Debug.pyr.skidding = self.skidding
 end
 
 function player:Draw()
@@ -114,27 +116,12 @@ end
 function player:Movement(dt)
     -- State controller:
     -- Input:
-    local isLeft = love.keyboard.isDown(self.input.left)
-    local isRight = love.keyboard.isDown(self.input.right)
     local isAction = love.keyboard.isDown(self.input.action)
-
-    if isRight then
-        self.movDirecction = 1
-    elseif isLeft then
-        self.movDirecction = -1
-    else 
-        if self.velocity.x >= -1 and self.velocity.x <= 1 then
-            self.velocity.x = 0
-            self.movDirecction = 0
-            self.moving = false
-        else
-            self.velocity.x = self.velocity.x - self.walkAcc * self.movDirecction * dt
-        end
-    end
+    local input = (love.keyboard.isDown(self.input.right) and 1 or 0) - (love.keyboard.isDown(self.input.left) and 1 or 0) -- Get input direction.
 
     -- Apply starter mov impulse if aren't moving before:
-    if not self.moving and self.movDirecction ~= 0 then
-        self.velocity.x = self.minWalk * self.movDirecction
+    if not self.moving and input ~= 0 then
+        self.velocity.x = self.minWalk
         self.moving = true -- Set move state.
     end
 
@@ -142,10 +129,46 @@ function player:Movement(dt)
 
     -- Physics:
     if self.moving then
-        if isRight then self.movDirecction = 1
-        elseif isLeft then self.movDirecction = -1 end
+        if input ~= 0 then -- Pressing left.
+            -- Skid:
+            self.skidding = Sign(self.velocity.x) ~= input and math.abs(self.velocity.x) > 0.00001
+			if self.skidding then
+				if math.abs(self.velocity.x) > self.turnThreshold then
+					self.velocity.x = self.velocity.x + self.skidDeacc * input * dt
+				else
+					self.velocity.x = 0.0
+                end
+            end
+        
+            if not self.running then
+                -- Walk:
+                -- Decel the run force:
+                if math.abs(self.velocity.x) > self.maxWalk + 2 then
+                    self.velocity.x = self.velocity.x - self.releaseDeacc * input * dt
+                    return
+                end
 
-        if isRight or isLeft then self.velocity.x = self.minWalk * self.movDirecction end
+                -- Apply walk force:
+                if math.abs(self.velocity.x) < self.maxWalk then self.velocity.x = self.velocity.x + self.walkAcc * input * dt
+                else self.velocity.x = self.maxWalk * input end
+            else
+                -- Running:
+                if math.abs(self.velocity.x) < self.maxRun then self.velocity.x = self.velocity.x + self.runAcc * input * dt
+                else self.velocity.x = self.maxRun * input end
+            end
+        else
+            -- If the player aren't idle, decel:
+            local lastMovementDir = self.velocity.x >= 0 and 1 or -1
+
+            local decelVelocity = math.abs(self.velocity.x) - self.releaseDeacc * dt
+
+            if decelVelocity <= 0 then
+                self.velocity.x = 0
+                self.moving = false
+            else
+                self.velocity.x = decelVelocity * lastMovementDir
+            end
+        end
     end
 end
 

@@ -11,8 +11,10 @@ local debug = {
 
     pyr = {
         vel = {},
+        onFloor = {},
         moving = {},
         running = {},
+        skidding = {},
     }
 }
 
@@ -36,8 +38,11 @@ function debug:Update()
         "PLAYER: ",
         "XVel: " .. tostring(self.pyr.vel.x),
         "YVel: " .. tostring(self.pyr.vel.y),
+        "OnFloor: " .. tostring(self.pyr.onFloor),
+        "- Movement -",
         "Moving: " .. tostring(self.pyr.moving),
         "Running: " .. tostring(self.pyr.running),
+        "skidding: " .. tostring(self.pyr.skidding),
     }
 
     -- Right column:
