@@ -2,6 +2,7 @@ local player = {}
 player.__index = player
 
 local Sign = require"lib.math.sign"
+local Clamp = require"lib.math.clamp"
 local Anim8 = require"lib.anim8"
 local BoxCollider = require"src.components.boxCollider"
 
@@ -15,8 +16,8 @@ function player.new()
 
     -- Input:
     self.input = {
-        left = "a", right = "d", up = "w", down = "d",
-        action = "k", jump = "l"
+        left = "z", right = "c", up = "s", down = "x",
+        action = "down", jump = "right"
     }
 
     -- States:
@@ -30,8 +31,12 @@ function player.new()
     self.skidding = false
     self.movMaxSpeed = false
 
+    self.jumping = false
+    self.fasterAirLimit = false
+    self.fasterAirSpd = false
+    self.fastJump = false
+    self.fastestJump = false
     self.jumped = false
-    self.jumpMaxDistance = false
 
     -- Parameters:
     self.walkAcc = 133.59375 -- Aceleración al caminar en tierra
@@ -65,10 +70,12 @@ function player.new()
     self.smallMarioTexture = love.graphics.newImage("assets/textures/smallMario.png")
     self.smallMarioGrid = Anim8.newGrid(16, 16, self.smallMarioTexture:getWidth(), self.smallMarioTexture:getHeight())
 
+    self.runAnimSpeed = 1
     self.animations = {
         idle = Anim8.newAnimation(self.smallMarioGrid("1-1", 1), 1),
         running = Anim8.newAnimation(self.smallMarioGrid("1-3", 2), 0.08),
-        jumping = Anim8.newAnimation(self.smallMarioGrid("2-2", 1), 1)
+        jumping = Anim8.newAnimation(self.smallMarioGrid("2-2", 1), 1),
+        skidding = Anim8.newAnimation(self.smallMarioGrid("3-3", 1), 1),
     }
     self.animationPlaying = self.animations.idle
     self.spriteDirecction = 1
@@ -79,6 +86,16 @@ end
 function player:Update(dt)
     self:CheckGround()
 
+    -- Check jump type before player jumps.
+    if self.onFloor then
+        self.fastestJump = math.abs(self.velocity.x) > self.fastestJumpThreshold
+		self.fastJump = math.abs(self.velocity.x) > self.fastJumpThreshold
+		self.fasterAirLimit	= math.abs(self.velocity.x) > self.maxWalk
+		self.fasterAirSpd = math.abs(self.velocity.x) > self.airSpdThreshold
+    end
+
+    self:Gravity(dt)
+    self:Jump(dt)
     self:Movement(dt)
 
     self:Death()
@@ -93,12 +110,15 @@ function player:Update(dt)
         {x = 16, y = 15}
     )
 
+    self.jumped = love.keyboard.isDown(self.input.jump) -- Save last jump input.
+
     -- DEBUG PARAMETERS:
     Debug.pyr.vel = self.velocity
     Debug.pyr.onFloor = self.onFloor
     Debug.pyr.moving = self.moving
     Debug.pyr.running = self.running
     Debug.pyr.skidding = self.skidding
+    Debug.pyr.RunAnimSpd = self.runAnimSpeed
 end
 
 function player:Draw()
@@ -113,15 +133,72 @@ end
 function player:KeyPressed(key)
 end
 
+function player:Gravity(dt)
+    if self.onFloor then
+        self.jumping = false
+        self.velocity.y = 0
+        self.position.y = self.collider.otherColPos.y - self.collider.size.y + 0.1
+    else
+        if self.velocity.y < 0.0 and love.keyboard.isDown(self.input.jump) then
+			if self.fastestJump then
+				self.velocity.y = self.velocity.y + self.bigUpDrag * dt
+            elseif self.fastJump then
+				self.velocity.y = self.velocity.y + self.mediumUpDrag * dt
+			else
+				self.velocity.y = self.velocity.y + self.smallUpDrag * dt
+            end
+		else
+			if self.fastestJump then
+				self.velocity.y = self.velocity.y + self.bigGravity * dt
+            elseif self.fastJump then
+				self.velocity.y = self.velocity.y + self.mediumGravity * dt
+			else
+				self.velocity.y = self.velocity.y + self.smallGravity * dt
+            end
+        end
+
+		-- Limit gravity if it exceeds its limit:
+		if self.velocity.y >= self.maxFall then
+			self.velocity.y = self.maxFall
+        end
+    end
+end
+
+function player:Jump(dt)
+    local isJump = love.keyboard.isDown(self.input.jump)
+
+    if self.onFloor and isJump and not self.jumped then
+        self.jumping = true
+        if self.fastestJump then self.velocity.y = -self.bigJumpSpd
+        else self.velocity.y = -self.jumpSpd end
+    end
+end
+
 function player:Movement(dt)
     -- State controller:
     -- Input:
     local isAction = love.keyboard.isDown(self.input.action)
     local input = (love.keyboard.isDown(self.input.right) and 1 or 0) - (love.keyboard.isDown(self.input.left) and 1 or 0) -- Get input direction.
 
+    -- Collisions:
+    if input == 1 and self.collider.colRight then
+        self.velocity.x = 0
+        self.position.x = self.collider.otherColPos.x - self.collider.size.x - 0.1
+        return
+    elseif input == -1 and self.collider.colLeft then
+        self.velocity.x = 0
+        self.position.x = self.collider.otherColPos.x + self.collider.otherColSize.x + 0.1
+        return
+    elseif input == 0 and (self.collider.colLeft or self.collider.colRight) and self.velocity.x ~= 0 then
+        self.velocity.x = 0
+        if self.collider.colRight then self.position.x = self.collider.otherColPos.x - self.collider.size.y + 0.1
+        elseif self.collider.colLeft then self.position.x = self.collider.otherColPos.x + self.collider.otherColSize.x + 0.1 end
+        return
+    end
+
     -- Apply starter mov impulse if aren't moving before:
     if not self.moving and input ~= 0 then
-        self.velocity.x = self.minWalk
+        self.velocity.x = self.minWalk * input
         self.moving = true -- Set move state.
     end
 
@@ -129,45 +206,62 @@ function player:Movement(dt)
 
     -- Physics:
     if self.moving then
-        if input ~= 0 then -- Pressing left.
-            -- Skid:
-            self.skidding = Sign(self.velocity.x) ~= input and math.abs(self.velocity.x) > 0.00001
-			if self.skidding then
-				if math.abs(self.velocity.x) > self.turnThreshold then
-					self.velocity.x = self.velocity.x + self.skidDeacc * input * dt
-				else
-					self.velocity.x = 0.0
-                end
-            end
-        
-            if not self.running then
-                -- Walk:
-                -- Decel the run force:
-                if math.abs(self.velocity.x) > self.maxWalk + 2 then
-                    self.velocity.x = self.velocity.x - self.releaseDeacc * input * dt
-                    return
+        if self.onFloor then
+            if input ~= 0 then -- Pressing left.
+                -- Skid:
+                self.skidding = Sign(self.velocity.x) ~= input and math.abs(self.velocity.x) > 0.00001
+                if self.skidding then
+                    if math.abs(self.velocity.x) > self.turnThreshold then
+                        self.velocity.x = self.velocity.x + self.skidDeacc * input * dt
+                    else
+                        self.velocity.x = 0.0
+                    end
                 end
 
-                -- Apply walk force:
-                if math.abs(self.velocity.x) < self.maxWalk then self.velocity.x = self.velocity.x + self.walkAcc * input * dt
-                else self.velocity.x = self.maxWalk * input end
+                if not self.running then
+                    -- Walk:
+                    -- Decel the run force:
+                    if math.abs(self.velocity.x) > self.maxWalk + 2 then
+                        self.velocity.x = self.velocity.x - self.releaseDeacc * input * dt
+                        return
+                    end
+
+                    -- Apply walk force:
+                    if math.abs(self.velocity.x) < self.maxWalk then self.velocity.x = self.velocity.x + self.walkAcc * input * dt
+                    else self.velocity.x = self.maxWalk * input end
+                else
+                    -- Running:
+                    if math.abs(self.velocity.x) < self.maxRun then self.velocity.x = self.velocity.x + self.runAcc * input * dt
+                    else self.velocity.x = self.maxRun * input end
+                end
             else
-                -- Running:
-                if math.abs(self.velocity.x) < self.maxRun then self.velocity.x = self.velocity.x + self.runAcc * input * dt
-                else self.velocity.x = self.maxRun * input end
+                -- If the player aren't idle, decel:
+                local lastMovementDir = self.velocity.x >= 0 and 1 or -1
+
+                local decelVelocity = math.abs(self.velocity.x) - self.releaseDeacc * dt
+
+                if decelVelocity <= 0 then
+                    self.velocity.x = 0
+                    self.moving = false
+                else
+                    self.velocity.x = decelVelocity * lastMovementDir
+                end
             end
         else
-            -- If the player aren't idle, decel:
-            local lastMovementDir = self.velocity.x >= 0 and 1 or -1
-
-            local decelVelocity = math.abs(self.velocity.x) - self.releaseDeacc * dt
-
-            if decelVelocity <= 0 then
-                self.velocity.x = 0
-                self.moving = false
-            else
-                self.velocity.x = decelVelocity * lastMovementDir
+            if input ~= 0 then
+                if math.abs(self.velocity.x) >= self.maxWalk then
+                    self.velocity.x = self.velocity.x + self.airFastAcc * input * dt
+                else
+                    if Sign(self.velocity.x) == input then							
+                        self.velocity.x = self.velocity.x + self.airSlowAcc * input * dt
+                    else
+                        if self.fasterAirSpd then self.velocity.x = self.airFastDrag else self.velocity.x = self.airSlowDrag end
+                    end
+                end
             end
+
+            if self.fasterAirLimit then self.velocity.x = Clamp(self.velocity.x, -self.maxRun, self.maxRun)
+            else self.velocity.x = Clamp(self.velocity.x, -self.maxWalk, self.maxWalk) end
         end
     end
 end
@@ -177,12 +271,7 @@ function player:Death()
 end
 
 function player:AnimationController(dt)
-
-    if not self.onFloor then
-        self.animationPlaying = self.animations.jumping
-        goto updateAnimation
-    end
-
+    -- Movement
     if love.keyboard.isDown(self.input.left) then
         self.animationPlaying = self.animations.running
         self.movementDirection = -1
@@ -191,7 +280,19 @@ function player:AnimationController(dt)
         self.movementDirection = 1
     else self.animationPlaying = self.animations.idle end
 
-    ::updateAnimation::
+    -- Run anim speed
+    if math.abs(self.velocity.x) <= self.maxWalk then self.runAnimSpeed = 0.08
+    elseif math.abs(self.velocity.x) <= self.minWalk then self.runAnimSpeed = 0.08
+    else self.runAnimSpeed = 0.08 end
+
+    if self.skidding then
+        self.animationPlaying = self.animations.skidding
+    end
+
+    if self.jumping then
+        self.animationPlaying = self.animations.jumping
+    end
+
     self.animationPlaying:update(dt)
 end
 

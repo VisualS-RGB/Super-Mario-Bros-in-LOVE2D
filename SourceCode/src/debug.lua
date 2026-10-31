@@ -15,6 +15,7 @@ local debug = {
         moving = {},
         running = {},
         skidding = {},
+        RunAnimSpd = {}
     }
 }
 
@@ -42,7 +43,8 @@ function debug:Update()
         "- Movement -",
         "Moving: " .. tostring(self.pyr.moving),
         "Running: " .. tostring(self.pyr.running),
-        "skidding: " .. tostring(self.pyr.skidding),
+        "Skidding: " .. tostring(self.pyr.skidding),
+        "RunAnimSpd: " .. tostring(self.pyr.RunAnimSpd)
     }
 
     -- Right column:
