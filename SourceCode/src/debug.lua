@@ -1,8 +1,8 @@
 local debug = {
-    debugMenu = true,
+    debugMenu = false,
     debugConfig = {
         mute = true,
-        showHitboxes = false,
+        showHitboxes = true,
         vsync = love.window.getVSync() ~= 0
     },
 
@@ -15,7 +15,6 @@ local debug = {
         moving = {},
         running = {},
         skidding = {},
-        RunAnimSpd = {}
     }
 }
 
@@ -44,7 +43,6 @@ function debug:Update()
         "Moving: " .. tostring(self.pyr.moving),
         "Running: " .. tostring(self.pyr.running),
         "Skidding: " .. tostring(self.pyr.skidding),
-        "RunAnimSpd: " .. tostring(self.pyr.RunAnimSpd)
     }
 
     -- Right column:

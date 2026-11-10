@@ -12,7 +12,7 @@ function player.new()
     -- Components:
     self.position = {x = 2.5 * 16, y = 12 * 16}
     self.velocity = {x = 0, y = 0}
-    self.collider = BoxCollider.new(nil, nil, 2)
+    self.collider = BoxCollider.new(nil, nil, 4)
 
     -- Input:
     self.input = {
@@ -121,7 +121,6 @@ function player:Update(dt)
     Debug.pyr.moving = self.moving
     Debug.pyr.running = self.running
     Debug.pyr.skidding = self.skidding
-    Debug.pyr.RunAnimSpd = self.runAnimSpeed
 end
 
 function player:Draw()
@@ -170,6 +169,12 @@ end
 function player:Jump(dt)
     local isJump = love.keyboard.isDown(self.input.jump)
 
+    if self.collider.colUp then
+        self.velocity.y = 0
+        self.position.y = self.position.y + 1
+        return
+    end
+
     if self.onFloor and isJump and not self.jumped then
         self.jumping = true
         if self.fastestJump then self.velocity.y = -self.bigJumpSpd
@@ -184,6 +189,20 @@ function player:Movement(dt)
     local input = (love.keyboard.isDown(self.input.right) and 1 or 0) - (love.keyboard.isDown(self.input.left) and 1 or 0) -- Get input direction.
     local acc = 0
 
+    if self.collider.colRight then
+        if input == 1 or self.velocity.x > 0 then
+            self.velocity.x = 0
+            return
+        end
+    end
+
+    if self.collider.colLeft then
+        if input == -1 or self.velocity.x < 0 then
+            self.velocity.x = 0
+            return
+        end
+    end
+
     -- Manage if are acctualy running:
     if isAction then
         self.sprintBuffer = self.sprintBufferAmount
@@ -192,6 +211,8 @@ function player:Movement(dt)
         if self.sprintBuffer > 0 then self.sprintBuffer = self.sprintBuffer - 1 end
         acc = self.walkAcc
     end
+
+    if self.skidding and self.velocity.x == 0 then self.skidding = false end -- Fix infinite skid state.
 
     if self.onFloor then
         if math.abs(input) > 0.01 then
@@ -262,9 +283,9 @@ function player:AnimationController(dt)
     else self.animationPlaying = self.animations.idle end
 
     -- Run anim speed
-    if math.abs(self.velocity.x) <= self.maxWalk then self.runAnimSpeed = 0.08
-    elseif math.abs(self.velocity.x) <= self.minWalk then self.runAnimSpeed = 0.08
-    else self.runAnimSpeed = 0.08 end
+    if math.abs(self.velocity.x) >= self.maxRun then self.runAnimSpeed = 1.96
+    elseif math.abs(self.velocity.x) >= self.maxWalk + 1 then self.runAnimSpeed = 1.62
+    else self.runAnimSpeed = 1 end
 
     if self.skidding then
         self.animationPlaying = self.animations.skidding
@@ -274,7 +295,7 @@ function player:AnimationController(dt)
         self.animationPlaying = self.animations.jumping
     end
 
-    self.animationPlaying:update(dt)
+    self.animationPlaying:update(dt * self.runAnimSpeed)
 end
 
 function player:CheckGround()
