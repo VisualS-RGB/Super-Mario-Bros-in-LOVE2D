@@ -1,7 +1,7 @@
 local debug = {
     debugMenu = false,
     debugConfig = {
-        mute = true,
+        mute = false,
         showHitboxes = true,
         vsync = love.window.getVSync() ~= 0
     },

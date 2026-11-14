@@ -41,33 +41,33 @@ function player.new()
     self.sprintBuffer = 0
     self.sprintBufferAmount = 10
 
-    -- Parameters:
-    self.walkAcc = 133.59375 -- Aceleración al caminar en tierra
-    self.runAcc = 200.390625 -- Aceleración al correr (con el botón de sprint presionado) en tierra
-    self.minWalk = 4.453125 -- Velocidad mínima inicial al empezar a caminar
-    self.maxWalk = 93.75 -- Velocidad máxima normal caminando
-    self.maxRun = 153.75 -- Velocidad máxima corriendo
-    self.releaseDeacc = 182.8125 -- Desaceleración/frenado natural al soltar el pad direccional
-    self.skidDeacc = 365.625 -- Desaceleración al girar o derrapar (cambiar de dirección bruscamente)
-    self.turnThreshold = 33.75 -- Umbral de velocidad a partir del cual se activa la animación y física de derrape
+    -- Physics parameters:
+    self.walkAcc = 133.59375
+    self.runAcc = 200.390625
+    self.minWalk = 4.453125
+    self.maxWalk = 93.75
+    self.maxRun = 153.75
+    self.releaseDeacc = 182.8125
+    self.skidDeacc = 365.625
+    self.turnThreshold = 33.75
 
-    self.airSpdThreshold = 108.75 -- Umbral de velocidad horizontal en el aire para determinar el tipo de resistencia
-    self.airSlowAcc = 133.59375 -- Aceleración en el aire cuando la velocidad es baja
-    self.airFastAcc = 200.390625 -- Aceleración en el aire cuando la velocidad es alta (mayor a maxWalk)
-    self.airFastDrag = 3.046875 -- Resistencia/frenado en el aire al ir a alta velocidad y presionar en contra
-    self.airSlowDrag = 2.2265625 -- Resistencia/frenado en el aire al ir a baja velocidad y presionar en contra
+    self.airSpdThreshold = 108.75
+    self.airSlowAcc = 133.59375
+    self.airFastAcc = 200.390625
+    self.airFastDrag = 3.046875
+    self.airSlowDrag = 2.2265625
 
-    self.jumpSpd = 240.0 -- Velocidad de impulso inicial para un salto normal/pequeño
-    self.bigJumpSpd = 300.0 -- Velocidad de impulso inicial para un salto largo/rápido (fastest jump)
-    self.smallUpDrag = 450.0 -- Resistencia a la subida (gravedad menor) para saltos cortos o baja velocidad
-    self.mediumUpDrag = 421.875 -- Resistencia a la subida para saltos a velocidad media
-    self.bigUpDrag = 562.5 -- Resistencia a la subida para saltos a máxima velocidad (mantiene el salto más tiempo arriba)
-    self.smallGravity = 1575.0 -- Gravedad aplicada al caer o soltar el botón de salto a baja velocidad
-    self.mediumGravity = 1350.0 -- Gravedad aplicada a velocidad media
-    self.bigGravity = 2025.0 -- Gravedad aplicada al caer a máxima velocidad o soltar el botón corriendo
-    self.fastJumpThreshold = 60.0 -- Umbral de velocidad horizontal para clasificar el salto como "rápido"
-    self.fastestJumpThreshold = 138.75 -- Umbral de velocidad horizontal para clasificar el salto como "muy rápido" (salto máximo)
-    self.maxFall = 240.0 -- Velocidad límite de caída (terminal velocity)
+    self.jumpSpd = 240.0
+    self.bigJumpSpd = 300.0
+    self.smallUpDrag = 450.0
+    self.mediumUpDrag = 421.875
+    self.bigUpDrag = 562.5
+    self.smallGravity = 1575.0
+    self.mediumGravity = 1350.0
+    self.bigGravity = 2025.0
+    self.fastJumpThreshold = 60.0
+    self.fastestJumpThreshold = 138.75
+    self.maxFall = 240.0
 
     -- Graphic design:
     self.smallMarioTexture = love.graphics.newImage("assets/textures/smallMario.png")
@@ -169,16 +169,20 @@ end
 function player:Jump(dt)
     local isJump = love.keyboard.isDown(self.input.jump)
 
+    -- If player collides with top, starts to fall:
     if self.collider.colUp then
         self.velocity.y = 0
         self.position.y = self.position.y + 1
         return
     end
 
+    -- Jump:
     if self.onFloor and isJump and not self.jumped then
         self.jumping = true
+        AudioManager:PlaySfx("jump.ogg", 50)
         if self.fastestJump then self.velocity.y = -self.bigJumpSpd
         else self.velocity.y = -self.jumpSpd end
+        self.jumped = false
     end
 end
 
