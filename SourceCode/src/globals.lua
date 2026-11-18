@@ -7,7 +7,7 @@ Push:setupScreen(
     256, 240, -- Fixed resolution.
     1280, 720, -- Real resolution.
     {
-        fullscreen = true,
+        fullscreen = false,
         vsync = true,
         resizable = true
     }

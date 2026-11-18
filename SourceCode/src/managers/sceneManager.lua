@@ -3,11 +3,12 @@ local scenesPath = "src.scenes."
 local sceneManager = {
     scenes = {
         -- Game scenes:
+        MainMenu = require(scenesPath .. "MainMenu"),
         Level1 = require(scenesPath .. "level1"),
     },
 }
 
-sceneManager.sceneSelected = sceneManager.scenes.Level1 -- Starter scene.
+sceneManager.sceneSelected = sceneManager.scenes.MainMenu -- Starter scene.
 
 function sceneManager:LoadScene(_scene)
     self.sceneSelected = _scene
